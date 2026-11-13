@@ -13,6 +13,7 @@ export default async (req) => {
   const origin = new URL(req.url).origin;
   const f = new URLSearchParams({
     mode: 'payment',
+    'managed_payments[enabled]': 'false',
     success_url: origin + '/?paid=1',
     cancel_url: origin + '/?paid=0',
     client_reference_id: u.sub,
@@ -29,7 +30,7 @@ export default async (req) => {
     body: f,
   });
   const s = await r.json();
-  if (!r.ok || !s.url) return json({ error: 'Could not start checkout.' }, 502);
+  if (!r.ok || !s.url) { console.error('stripe', r.status, JSON.stringify(s)); return json({ error: 'Could not start checkout. Stripe says: ' + ((s && s.error && s.error.message) || r.status) }, 502); }
   return json({ url: s.url });
 };
 export const config = { path: '/api/checkout' };
