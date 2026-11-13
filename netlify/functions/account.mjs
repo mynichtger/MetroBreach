@@ -1,10 +1,10 @@
-import { json, verifyGoogle, loadAcct, saveAcct, pub, CATALOG, EARN_PER_CALL, EARN_PER_HOUR } from './lib.mjs';
+import { json, authUser, newSession, endSession, loadAcct, saveAcct, pub, CATALOG, EARN_PER_CALL, EARN_PER_HOUR } from './lib.mjs';
 
 export default async (req) => {
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
   let b;
   try { b = await req.json(); } catch { return json({ error: 'bad json' }, 400); }
-  const u = await verifyGoogle(b.token);
+  const u = await authUser(b.token);
   if (!u) return json({ error: 'signin' }, 401);
   const a = await loadAcct(u.sub);
   const k = b.k === 'g' ? 'g' : 'c';
@@ -27,11 +27,15 @@ export default async (req) => {
     const give = Math.max(0, Math.min(n, EARN_PER_HOUR - a.earn.n));
     a.earn.n += give; a.cr += give;
     if (give) await saveAcct(u.sub, a);
+  } else if (b.op === 'logout') {
+    await endSession(b.token);
+    return json({ ok: true });
   } else if (b.op !== 'load') {
     return json({ error: 'unknown op' }, 400);
   } else {
     await saveAcct(u.sub, a);
   }
-  return json({ ok: true, user: { name: u.name, picture: u.picture }, data: pub(a) });
+  const sess = b.op === 'load' && !u.session ? await newSession(u) : undefined;
+  return json({ ok: true, sess, user: { name: u.name, picture: u.picture }, data: pub(a) });
 };
 export const config = { path: '/api/account' };

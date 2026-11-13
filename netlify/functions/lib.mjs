@@ -78,3 +78,29 @@ export function verifyStripeSignature(body, header, secret, now = Date.now()) {
   const a = Buffer.from(exp), b = Buffer.from(v1);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
+
+// Long-lived login sessions. After one Google sign-in the server hands out its own random token,
+// so the player stays signed in on this device (about 90 days) without Google's 1-hour token.
+const sha = (t) => crypto.createHash('sha256').update(t).digest('hex');
+export async function newSession(u) {
+  const t = crypto.randomBytes(32).toString('hex');
+  const s = await store();
+  await s.setJSON('sess/' + sha(t), { sub: u.sub, name: u.name, picture: u.picture, exp: Date.now() + 90 * 86400000 });
+  return 'S.' + t;
+}
+export async function authUser(token) {
+  if (typeof token !== 'string') return null;
+  if (token.startsWith('S.')) {
+    const t = token.slice(2);
+    if (!/^[0-9a-f]{64}$/.test(t)) return null;
+    const r = await (await store()).get('sess/' + sha(t), { type: 'json' });
+    if (!r || !(r.exp > Date.now())) return null;
+    return { sub: r.sub, name: r.name, picture: r.picture, session: true };
+  }
+  return verifyGoogle(token);
+}
+export async function endSession(token) {
+  if (typeof token !== 'string' || !token.startsWith('S.')) return;
+  const t = token.slice(2);
+  if (/^[0-9a-f]{64}$/.test(t)) await (await store()).delete('sess/' + sha(t));
+}

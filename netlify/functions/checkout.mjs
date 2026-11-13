@@ -1,4 +1,4 @@
-import { json, verifyGoogle, PACKS } from './lib.mjs';
+import { json, authUser, PACKS } from './lib.mjs';
 
 export default async (req) => {
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
@@ -6,7 +6,7 @@ export default async (req) => {
   if (!key) return json({ error: 'Payments are not set up yet.' }, 503);
   let b;
   try { b = await req.json(); } catch { return json({ error: 'bad json' }, 400); }
-  const u = await verifyGoogle(b.token);
+  const u = await authUser(b.token);
   if (!u) return json({ error: 'signin' }, 401);
   const pack = PACKS.find((p) => p.id === b.pack);
   if (!pack) return json({ error: 'unknown pack' }, 400);
